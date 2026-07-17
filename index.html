@@ -1,0 +1,562 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AO3 Tooltip Formatter</title>
+<style>
+  :root {
+    --ink: #e8e3da;
+    --ink-dim: #8a8378;
+    --bg: #14110f;
+    --bg-panel: #1c1815;
+    --line: #332c25;
+    --accent: #a8443a;
+    --accent-dim: #6e332c;
+    --ink-faint: #4a433a;
+    --mono: 'JetBrains Mono', 'SF Mono', Menlo, Consolas, monospace;
+    --serif: 'Georgia', 'Iowan Old Style', serif;
+    --ao3-body: 'Lucida Grande', 'Lucida Sans Unicode', Verdana, Helvetica, sans-serif, 'GNU Unifont';
+
+    /* type scale — every font-size in the page pulls from here */
+    --fs-label: 13px;   /* uppercase micro-labels, fine print, counters */
+    --fs-body: 15px;    /* prose and UI controls */
+    --fs-input: 17px;   /* content you read or type */
+    --fs-heading: 32px; /* page title */
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: var(--mono);
+    margin: 0;
+    padding: 40px 24px 80px;
+    min-height: 100vh;
+  }
+
+  .wrap {
+    width: 100%;
+  }
+
+  header {
+    margin-bottom: 44px;
+    border-bottom: 1px solid var(--line);
+    padding-bottom: 20px;
+  }
+
+  .privacy-note {
+    font-size: var(--fs-label);
+    color: var(--ink-dim);
+    letter-spacing: 0.3px;
+    margin-bottom: 22px;
+    padding-bottom: 16px;
+    border-bottom: 1px dashed var(--line);
+  }
+
+  h1 {
+    font-family: var(--serif);
+    font-weight: 400;
+    font-size: var(--fs-heading);
+    color: var(--ink);
+    margin: 0 0 8px;
+    letter-spacing: 0.2px;
+  }
+
+  .byline {
+    font-size: var(--fs-body);
+    color: var(--ink-dim);
+    margin-bottom: 24px;
+  }
+
+  .byline a,
+  .sub a {
+    color: var(--accent);
+    text-decoration: underline dotted;
+  }
+
+  .byline a:hover,
+  .sub a:hover {
+    color: #c25a4d;
+  }
+
+  .sub {
+    color: var(--ink-dim);
+    font-size: var(--fs-body);
+    line-height: 1.6;
+  }
+
+  .sub + .sub {
+    margin-top: 18px;
+  }
+
+  .sub code {
+    color: var(--accent);
+    background: none;
+  }
+
+  .toggle {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 26px;
+    font-size: var(--fs-label);
+    color: var(--ink-dim);
+    cursor: pointer;
+    user-select: none;
+    width: fit-content;
+  }
+
+  .toggle input {
+    accent-color: var(--accent);
+    width: 14px;
+    height: 14px;
+    cursor: pointer;
+  }
+
+  .toggle:hover { color: var(--ink); }
+
+  .format-hints {
+    margin-top: 18px;
+  }
+
+  .hints-spoiler {
+    background: var(--bg-panel);
+    border: 1px solid var(--line);
+    border-radius: 3px;
+  }
+
+  .hints-spoiler summary {
+    padding: 10px 16px;
+    font-size: var(--fs-label);
+    color: var(--ink-dim);
+    cursor: pointer;
+    list-style: none;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .hints-spoiler summary::-webkit-details-marker {
+    display: none;
+  }
+
+  .hints-spoiler summary::before {
+    content: '▸';
+    color: var(--accent);
+    font-size: 10px; /* icon glyph, not body text */
+    transition: transform 0.15s ease;
+  }
+
+  .hints-spoiler[open] summary::before {
+    transform: rotate(90deg);
+  }
+
+  .hints-spoiler summary:hover {
+    color: var(--ink);
+  }
+
+  .hints-body {
+    padding: 4px 16px 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 9px;
+    border-top: 1px solid var(--line);
+    padding-top: 12px;
+  }
+
+  .hints-body .hint {
+    font-size: var(--fs-label);
+    line-height: 1.6;
+    color: var(--ink-dim);
+  }
+
+  .hints-body code {
+    color: var(--accent);
+    background: rgba(168, 68, 58, 0.1);
+    padding: 1px 5px;
+    border-radius: 2px;
+  }
+
+  .hints-body strong,
+  .hints-body em,
+  .hints-body s {
+    color: var(--ink);
+  }
+
+  .field {
+    margin-bottom: 22px;
+  }
+
+  .field-label {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    font-size: var(--fs-label);
+    text-transform: uppercase;
+    letter-spacing: 1.2px;
+    color: var(--ink-dim);
+    margin-bottom: 8px;
+  }
+
+  .label-left {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+  }
+
+  textarea {
+    width: 100%;
+    background: var(--bg-panel);
+    border: 1px solid var(--line);
+    color: var(--ink);
+    font-family: var(--mono);
+    font-size: var(--fs-input);
+    line-height: 1.6;
+    padding: 16px;
+    border-radius: 3px;
+    resize: vertical;
+    min-height: 160px;
+    transition: border-color 0.15s ease;
+  }
+
+  textarea:focus {
+    outline: none;
+    border-color: var(--accent-dim);
+  }
+
+  textarea::placeholder {
+    color: var(--ink-faint);
+  }
+
+  #output {
+    min-height: 160px;
+    color: var(--ink);
+  }
+
+  .actions {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+  }
+
+  button {
+    background: var(--accent-dim);
+    color: var(--ink);
+    border: 1px solid var(--accent);
+    font-family: var(--mono);
+    font-size: var(--fs-body);
+    padding: 10px 18px;
+    border-radius: 3px;
+    cursor: pointer;
+    transition: background 0.15s ease;
+  }
+
+  button:hover { background: var(--accent); }
+
+  button:active { transform: translateY(1px); }
+
+  .link-btn {
+    background: none;
+    border: none;
+    color: var(--ink-dim);
+    font-family: var(--mono);
+    font-size: var(--fs-label);
+    text-decoration: underline dotted;
+    padding: 0;
+    cursor: pointer;
+  }
+
+  .link-btn:hover {
+    background: none;
+    color: var(--accent);
+  }
+
+  .clear-btn:disabled,
+  .clear-btn:disabled:hover {
+    color: #4a433a;
+    cursor: default;
+    text-decoration: none;
+  }
+
+  .count {
+    font-size: var(--fs-label);
+    color: var(--ink-dim);
+  }
+
+  .status {
+    font-size: var(--fs-label);
+    color: var(--accent);
+    opacity: 0;
+    transition: opacity 0.2s ease;
+  }
+
+  .status.show { opacity: 1; }
+
+  .preview-block {
+    margin-top: 36px;
+    padding-top: 24px;
+    border-top: 1px solid var(--line);
+  }
+
+  .preview-label {
+    font-size: var(--fs-label);
+    text-transform: uppercase;
+    letter-spacing: 1.2px;
+    color: var(--ink-dim);
+    margin-bottom: 12px;
+  }
+
+  #preview {
+    font-family: var(--ao3-body);
+    font-size: var(--fs-input);
+    line-height: 1.6;
+    color: #191919;
+    background: #fff;
+    padding: 22px 26px;
+    border-radius: 4px;
+  }
+
+  #preview p {
+    margin: 0 0 1em;
+  }
+
+  #preview p:last-child {
+    margin-bottom: 0;
+  }
+
+  .tooltip {
+    position: relative;
+    display: inline-block;
+    border-bottom: 1px dotted black;
+  }
+
+  .tooltip .tooltiptext {
+    visibility: hidden;
+    width: 120px;
+    margin-left: -20px;
+    background-color: #f0f1f0;
+    color: #000;
+    text-align: center;
+    padding: 5px 10px;
+    border-radius: 5px;
+    position: absolute;
+    z-index: 99999;
+    bottom: 100%;
+    left: 50%;
+    overflow-wrap: break-word;
+    box-shadow: 1px 1px 2px 0px #8a1b10;
+    -webkit-box-shadow: 1px 1px 2px 0px #8a1b10;
+    -moz-box-shadow: 1px 1px 2px 0px #8a1b10;
+    -o-box-shadow: 1px 1px 2px 0px #8a1b10;
+    -ms-box-shadow: 1px 1px 2px 0px #8a1b10;
+  }
+
+  .tooltip:hover .tooltiptext {
+    visibility: visible;
+  }
+
+  .tooltip .tooltiptext::after {
+    content: " ";
+    position: absolute;
+    top: 100%;
+    left: 20%;
+    margin-left: -5px;
+    border-width: 5px;
+    border-style: solid;
+    border-color: #f0f1f0 transparent transparent transparent;
+  }
+
+  footer {
+    margin-top: 40px;
+    text-align: center;
+  }
+
+  .footer-note {
+    font-size: var(--fs-label);
+    color: var(--ink-faint);
+    line-height: 1.7;
+  }
+
+  .footer-contact {
+    font-size: var(--fs-body);
+    color: var(--ink-dim);
+    line-height: 1.6;
+    margin-top: 28px;
+  }
+
+  .footer-contact a,
+  footer a {
+    color: var(--accent);
+    text-decoration: underline dotted;
+  }
+
+  .footer-contact a:hover,
+  footer a:hover {
+    color: #c25a4d;
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="privacy-note">🔒 Nothing you type here is sent anywhere or saved — it stays only in this browser tab.</div>
+    <h1>AO3 Tooltip Formatter</h1>
+    <div class="byline">by <a href="https://k0terina.tumblr.com" target="_blank" rel="noopener">k0terina</a></div>
+    <div class="sub">
+      Built for pairing with <a href="https://archiveofourown.org/works/30290274" target="_blank" rel="noopener">Simbeline's tooltips Work Skin</a> — this converts your text to the HTML tags that skin targets.
+    </div>
+    <div class="sub">
+      Use <code>(visible text;[hover text])</code>. Paste your whole chapter here — we'll only touch tooltips, plus formatting if you enable it below.
+    </div>
+    <label class="toggle">
+      <input type="checkbox" id="markup-toggle">
+      <span>also turn bold, italic and strikethrough into formatting</span>
+    </label>
+    <div class="format-hints">
+      <details class="hints-spoiler">
+        <summary>How do I add bold, italic or strikethrough text?</summary>
+        <div class="hints-body">
+          <div class="hint"><code>**text**</code> — two asterisks on each side makes it <strong>bold</strong>.</div>
+          <div class="hint"><code>*text*</code> — one asterisk on each side makes it <em>italic</em>.</div>
+          <div class="hint"><code>~~text~~</code> — two tildes makes it <s>struck through</s>.</div>
+          <div class="hint">Need a real asterisk or tilde that shouldn't turn into formatting? Put a backslash right before it: <code>\*</code> or <code>\~</code></div>
+        </div>
+      </details>
+    </div>
+  </header>
+
+  <div class="field">
+    <div class="field-label">
+      <div class="label-left">
+        <span>your text</span>
+        <button type="button" id="example-btn" class="link-btn">see example</button>
+      </div>
+      <div class="actions">
+        <span class="count" id="in-count">0 matches</span>
+        <button type="button" id="clear-btn" class="link-btn clear-btn">clear</button>
+      </div>
+    </div>
+    <textarea id="input" placeholder="*(Da;[Yes])*, like that, Hollander."></textarea>
+  </div>
+
+  <div class="field">
+    <div class="field-label">
+      <span>code to paste into AO3</span>
+      <div class="actions">
+        <span class="status" id="status">copied</span>
+        <button type="button" id="copy-btn">Copy code</button>
+      </div>
+    </div>
+    <textarea id="output" readonly></textarea>
+  </div>
+
+  <div class="preview-block">
+    <div class="preview-label">preview — hover the underlined words</div>
+    <div id="preview">—</div>
+  </div>
+
+  <div class="footer-contact">Questions, suggestions, or want something similar built? Reach out to me on <a href="https://k0terina.tumblr.com" target="_blank" rel="noopener">tumblr</a>.</div>
+
+  <footer>
+    <div class="footer-note">❗ This tool only builds the tags shown above. For the hover effect to actually work on AO3, you still need to add the CSS from <a href="https://archiveofourown.org/works/30290274" target="_blank" rel="noopener">Simbeline's Work Skin</a> to your fic's Work Skin.</div>
+  </footer>
+</div>
+
+<script>
+const TOOLTIP_PATTERN = /\(([^;()]+);\[([^\]]+)\]\)/g;
+const BOLD_PATTERN = /\*\*(.+?)\*\*/g;
+const ITALIC_PATTERN = /(?<!\*)\*(?!\*)(.+?)(?<!\*)\*(?!\*)/g;
+const STRIKE_PATTERN = /~~(.+?)~~/g;
+const ESCAPE_PATTERN = /\\([*~])/g;
+
+const input = document.getElementById('input');
+const output = document.getElementById('output');
+const preview = document.getElementById('preview');
+const inCount = document.getElementById('in-count');
+const copyBtn = document.getElementById('copy-btn');
+const status = document.getElementById('status');
+const markupToggle = document.getElementById('markup-toggle');
+const exampleBtn = document.getElementById('example-btn');
+const clearBtn = document.getElementById('clear-btn');
+const EXAMPLE_TEXT = '*(Da;[Yes])*, like that, Hollander.';
+const STATUS_DURATION_MS = 1400;
+
+function applyMarkup(html) {
+  // stash escaped markers (\* \~) so they survive markup conversion, then restore after
+  html = html.replace(ESCAPE_PATTERN, (m, c) => `\u0000${c.charCodeAt(0)}\u0000`);
+  html = html.replace(BOLD_PATTERN, '<strong>$1</strong>');
+  html = html.replace(ITALIC_PATTERN, '<em>$1</em>');
+  html = html.replace(STRIKE_PATTERN, '<s>$1</s>');
+  return html.replace(/\u0000(\d+)\u0000/g, (m, code) => String.fromCharCode(+code));
+}
+
+// AO3's own parser turns a single return into <br> and a blank line (double
+// return) into a new <p> when a work is saved — this just mirrors that for
+// the preview. The copy-paste output stays plain text; AO3 does this part.
+function toAo3Paragraphs(html) {
+  return html
+    .split(/\n{2,}/)
+    .map(block => block.trim())
+    .filter(block => block.length > 0)
+    .map(block => `<p>${block.replace(/\n/g, '<br>')}</p>`)
+    .join('');
+}
+
+function convert() {
+  const raw = input.value;
+  clearBtn.disabled = raw.length === 0;
+
+  let html = markupToggle.checked ? applyMarkup(raw) : raw;
+
+  let count = 0;
+  html = html.replace(TOOLTIP_PATTERN, (match, text, hover) => {
+    count++;
+    return `<span class="tooltip">${text}<span class="tooltiptext">${hover}</span></span>`;
+  });
+  inCount.textContent = count + (count === 1 ? ' match' : ' matches');
+
+  output.value = html;
+  preview.innerHTML = raw.trim() ? toAo3Paragraphs(html) : '—';
+}
+
+input.addEventListener('input', convert);
+markupToggle.addEventListener('change', convert);
+exampleBtn.addEventListener('click', () => {
+  input.value = EXAMPLE_TEXT;
+  markupToggle.checked = true;
+  convert();
+  input.focus();
+});
+clearBtn.addEventListener('click', () => {
+  input.value = '';
+  convert();
+  input.focus();
+});
+
+function showCopiedStatus() {
+  status.classList.add('show');
+  setTimeout(() => status.classList.remove('show'), STATUS_DURATION_MS);
+}
+
+copyBtn.addEventListener('click', () => {
+  output.select();
+  try {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(output.value)
+        .catch(() => document.execCommand('copy'))
+        .then(showCopiedStatus);
+    } else {
+      document.execCommand('copy');
+      showCopiedStatus();
+    }
+  } catch (e) {
+    console.error('Copy failed:', e);
+  }
+});
+
+convert();
+</script>
+</body>
+</html>
