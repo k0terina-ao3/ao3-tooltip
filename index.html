@@ -483,6 +483,13 @@ const clearBtn = document.getElementById('clear-btn');
 const EXAMPLE_TEXT = '*(Da;[Yes])*, like that, Hollander.';
 const STATUS_DURATION_MS = 1400;
 
+// AO3 ships Bootstrap's dropdown.js, which binds a page-wide click listener
+// unrelated to tooltips. Its mere presence flips mobile WebKit/Chromium into
+// tap-to-toggle for :hover state instead of hold-to-reveal. This no-op
+// listener reproduces that so the preview's tap behavior matches the real
+// AO3 page (confirmed on-device).
+document.body.addEventListener('click', function () {});
+
 function applyMarkup(html) {
   // stash escaped markers (\* \~) so they survive markup conversion, then restore after
   html = html.replace(ESCAPE_PATTERN, (m, c) => `\u0000${c.charCodeAt(0)}\u0000`);
